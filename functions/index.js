@@ -13,7 +13,13 @@
 const functions = require("firebase-functions");
 const admin     = require("firebase-admin");
 
-admin.initializeApp();
+// Service Account JSON dosyasını functions klasörü içine koyun
+// Örn: functions/serviceAccountKey.json
+const serviceAccount = require("./serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 // ============================================================
 // TRIGGER 1: cihaz_durumu "tehlike" olduğunda push bildirim

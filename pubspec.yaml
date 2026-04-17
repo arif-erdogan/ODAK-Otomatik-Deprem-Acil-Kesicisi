@@ -1,3 +1,14 @@
+name: odak
+
+description: ODAK Otomatik Deprem Acil Kesicisi mobil uygulamasi.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
@@ -7,3 +18,24 @@ dependencies:
   flutter_blue_plus: ^1.31.0
   connectivity_plus: ^6.0.0
   permission_handler: ^11.0.0
+  http: ^1.2.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: odak_logo_1.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: odak_logo_1.png
+
+flutter:
+  uses-material-design: true
+  assets:
+    - odak_logo_1.png

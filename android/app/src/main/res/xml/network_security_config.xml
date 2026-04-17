@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  network_security_config.xml
+  Android 9+ (API 28+) HTTP yerel ağ erişimine izin verir.
+  ESP32, HTTP (şifresiz) üzerinden konuşur — bu yapılandırma zorunlu.
+-->
+<network-security-config>
+    <!-- Yerel ağ IP aralıkları için HTTP'ye izin ver -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 192.168.x.x — ev/ofis router'ı -->
+        <domain includeSubdomains="true">192.168</domain>
+        <!-- 10.x.x.x — bazı router'lar -->
+        <domain includeSubdomains="true">10</domain>
+        <!-- 172.16-31.x.x — diğer özel ağlar -->
+        <domain includeSubdomains="true">172</domain>
+        <!-- mDNS — odak.local -->
+        <domain includeSubdomains="true">local</domain>
+    </domain-config>
+
+    <!-- Genel internet trafiği (Firebase için) HTTPS zorunlu -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

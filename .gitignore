@@ -1,0 +1,25 @@
+# Flutter
+.dart_tool/
+.packages
+.pub/
+/build/
+*.iml
+
+# Firebase Functions
+functions/node_modules/
+
+# Firebase Secrets (API anahtarları — GIT'E EKLEMEYİN!)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# IDE
+.vscode/
+.idea/
+
+# ESP32 Secrets (WiFi şifresi vb.)
+esp32_firmware/secrets.h
+
+# OS
+.DS_Store
+Thumbs.db

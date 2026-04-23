@@ -1,0 +1,54 @@
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.9.1" apply false
+    id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+}
+
+include ":app"
+
+// ─── AGP 8.x: Eski Plugin Namespace Düzeltmesi ───────────────────────────────
+// flutter_bluetooth_serial v0.4.0 gibi AGP 7.x döneminde yazılmış paketler
+// build.gradle'larında 'namespace' tanımlamıyor; AGP 8.x bunu zorunlu kılıyor.
+//
+// Çözüm: gradle.allprojects{} Settings API'si — projenin build script'i çalışmadan
+// ÖNCE afterEvaluate callback'ini kaydeder. Bu sayede "project already evaluated"
+// hatası oluşmaz (android/build.gradle içindeki subprojects{afterEvaluate{}} hatası
+// Flutter'ın erken proje evaluation'ından kaynaklanıyordu).
+gradle.allprojects { proj ->
+    proj.afterEvaluate {
+        if (proj.plugins.hasPlugin("com.android.library")) {
+            try {
+                def androidExt = proj.extensions.findByName("android")
+                if (androidExt && !androidExt.namespace) {
+                    def manifestFile = androidExt.sourceSets?.main?.manifest?.srcFile
+                    if (manifestFile?.exists()) {
+                        def pkgName = new XmlParser().parse(manifestFile)['@package']?.toString()
+                        if (pkgName) {
+                            androidExt.namespace = pkgName
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // Sessizce atla — kritik değil
+            }
+        }
+    }
+}

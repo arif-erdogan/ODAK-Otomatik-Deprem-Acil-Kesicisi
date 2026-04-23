@@ -1,155 +1,148 @@
-# ODAK — ESP32 REST API Kontratı (v1.1)
+# ODAK — Bluetooth Serial Protokol Kontratı (v2.0)
 
 Hazırlayan: ODAK Geliştirme Ekibi  
-Versiyon: 1.1  
-Tarih: 2026-04-17
+Versiyon: 2.0  
+Tarih: 2026-04-20
 
 ---
 
 ## Genel Kurallar
 
-- **Bağlantı**: ESP32 SoftAP — SSID: `ODAK_Sistem`, Şifre: `odak1234`
-- **Base URL**: `http://192.168.4.1`
-- **Port**: `80`
-- **Protokol**: HTTP/1.1 (yerel ağ, HTTPS gerekmez)
-- **İçerik tipi**: `Content-Type: application/json`
-- **CORS**: `Access-Control-Allow-Origin: *`
-- **Timeout**: Client tarafı 4 saniye
+- **Donanım**: Arduino Uno + HC-06 Bluetooth modülü
+- **Protokol**: Bluetooth SPP (Serial Port Profile)
+- **Baud Rate**: 9600
+- **HC-06 Cihaz Adı**: `HC-06` (veya varsayılan `HC-06`)
+- **HC-06 PIN**: `1234`
+- **Veri formatı**: Düz metin (text), satır sonu: `\n`
+- **Karakter kodlaması**: UTF-8
 
 ---
 
-## Endpoint Listesi
+## Mesaj Formatları
 
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| GET | `/api/ping` | Canlılık kontrolü |
-| GET | `/api/status` | Tam sistem durumu |
-| POST | `/api/command` | Komut gönder |
-| OPTIONS | Tüm endpointler | CORS preflight |
+### 1. Durum Mesajı (Arduino → Telefon)
 
----
-
-### 1. Canlılık Kontrolü
+Her 2 saniyede otomatik gönderilir.
 
 ```
-GET /api/ping
-```
-
-**Yanıt (200):**
-```json
-{ "ok": true }
-```
-
----
-
-### 2. Sistem Durumu
-
-```
-GET /api/status
-```
-
-**Yanıt (200):**
-```json
-{
-  "ok": true,
-  "deprem": false,
-  "gaz_acik": true,
-  "elektrik_acik": true,
-  "deprem_sayaci": 0,
-  "esik_deger": 3.0,
-  "ip": "192.168.4.1",
-  "uptime_sn": 3600,
-  "sistem_durumu": "guvenli"
-}
+STATUS:deprem=X,gaz=X,elek=X,sayac=X,esik=X.X,uptime=X
 ```
 
 | Alan | Tip | Açıklama |
 |------|-----|----------|
-| `ok` | bool | Yanıt geçerliliği |
-| `deprem` | bool | Deprem algılandı mı |
-| `gaz_acik` | bool | true = gaz açık (güvende), false = alarm |
-| `elektrik_acik` | bool | true = elektrik var, false = kesildi |
-| `deprem_sayaci` | int | Ardışık eşik aşım sayısı (0-2 normal) |
-| `esik_deger` | float | Deprem sapma eşiği (m/s²) |
-| `ip` | string | ESP32 SoftAP IP adresi |
-| `uptime_sn` | int | Çalışma süresi (saniye) |
-| `sistem_durumu` | string | `"guvenli"` veya `"tehlike"` |
+| `deprem` | 0/1 | 0 = yok, 1 = deprem algılandı |
+| `gaz` | 0/1 | 0 = kapalı (alarm), 1 = açık (güvende) |
+| `elek` | 0/1 | 0 = kesik (alarm), 1 = açık (güvende) |
+| `sayac` | int | Ardışık eşik aşım sayısı (0-2 normal, 3 = tetikleme) |
+| `esik` | float | Deprem sapma eşiği (m/s²) |
+| `uptime` | int | Çalışma süresi (saniye) |
 
----
-
-### 3. Komut Gönder
-
+**Örnek:**
 ```
-POST /api/command
-Content-Type: application/json
-```
-
-**Body:**
-```json
-{ "command": "<komut_adi>" }
-```
-
-#### Komut: `dogalgaz_ac`
-
-```json
-// Yanıt (200):
-{ "ok": true, "message": "dogalgaz ac komutu uygulandi", "gaz_acik": true }
-```
-
-#### Komut: `elektrik_ac`
-
-```json
-// Yanıt (200):
-{ "ok": true, "message": "elektrik ac komutu uygulandi", "elektrik_acik": true }
-```
-
-#### Komut: `reset_alarm`
-
-```json
-// Yanıt (200):
-{
-  "ok": true,
-  "message": "alarm resetlendi",
-  "gaz_acik": true,
-  "elektrik_acik": true,
-  "deprem": false
-}
+STATUS:deprem=0,gaz=1,elek=1,sayac=0,esik=3.0,uptime=3600
 ```
 
 ---
 
-## Hata Yanıtları
+### 2. Komut Mesajı (Telefon → Arduino)
 
-```json
-{ "ok": false, "error": "Hata açıklaması" }
+```
+CMD:<komut_adi>
 ```
 
-| HTTP Kodu | Durum |
-|-----------|-------|
-| 200 | Başarılı |
-| 400 | Geçersiz istek (eksik body/alan, bilinmeyen komut) |
-| 404 | Endpoint bulunamadı |
+| Komut | Açıklama |
+|-------|----------|
+| `dogalgaz_ac` | Gaz alarmını kaldır, gaz sistemi aç |
+| `elektrik_ac` | Elektrik alarmını kaldır, elektriği ver |
+| `reset_alarm` | Tüm alarmları sıfırla (gaz + elektrik aç) |
+| `durum` | Anlık durum isteği (STATUS yanıtı tetiklenir) |
+
+**Örnekler:**
+```
+CMD:dogalgaz_ac
+CMD:elektrik_ac
+CMD:reset_alarm
+CMD:durum
+```
+
+---
+
+### 3. Yanıt Mesajları (Arduino → Telefon)
+
+#### Başarılı yanıt:
+```
+OK:<komut_adi>
+```
+
+#### Hata yanıtı:
+```
+ERR:<hata_aciklamasi>
+```
+
+#### Alarm bildirimi:
+```
+ALARM:deprem_algilandi
+```
+
+#### Bilgi mesajı:
+```
+INFO:<bilgi>
+```
+
+| Mesaj | Açıklama |
+|-------|----------|
+| `OK:dogalgaz_ac` | Gaz açıldı |
+| `OK:elektrik_ac` | Elektrik verildi |
+| `OK:reset_alarm` | Tüm alarmlar sıfırlandı |
+| `ERR:bilinmeyen_komut:xxx` | Bilinmeyen komut |
+| `ERR:gecersiz_format` | CMD: öneki eksik |
+| `ERR:buffer_tasti` | Gelen veri çok uzun |
+| `ERR:mpu6050_bulunamadi` | Sensör bağlantı hatası |
+| `ALARM:deprem_algilandi` | Deprem tespit edildi |
+| `INFO:sistem_hazir` | Sistem başlatıldı |
+| `INFO:kalibrasyon_basliyor` | Kalibrasyon başlıyor |
 
 ---
 
 ## Flutter Servis Eşleşmesi
 
-| ESP32 Endpoint | Flutter Metodu | Açıklama |
+| Arduino Mesajı | Flutter Metodu | Açıklama |
 |---------------|---------------|----------|
-| `GET /api/ping` | `WifiApiService.ping()` | Bağlantı testi |
-| `GET /api/status` | `WifiApiService.durumAl()` | Polling ile durum |
-| `POST dogalgaz_ac` | `WifiApiService.gazAc()` | Gaz alarmı kaldır |
-| `POST elektrik_ac` | `WifiApiService.elektrikAktifEt()` | Elektrik ver |
-| `POST reset_alarm` | `WifiApiService.sistemSifirla()` | Tam sıfırlama |
+| `STATUS:...` | `BleService.arduinoDurumStream` | Otomatik durum güncellemesi |
+| `OK:` / `ERR:` | `BleService.yanitStream` | Komut yanıtı |
+| `ALARM:` | `BleService.arduinoDurumStream` | Deprem uyarısı |
+| `CMD:dogalgaz_ac` | `BleService.dogalgazAktifEt()` | Gaz aç |
+| `CMD:elektrik_ac` | `BleService.elektrikAktifEt()` | Elektrik ver |
+| `CMD:reset_alarm` | `BleService.alarmSifirla()` | Alarm sıfırla |
+| `CMD:durum` | `BleService.durumIste()` | Durum iste |
 
 ---
 
-## Test Örnekleri
+## Pin Bağlantıları
 
-```bash
-curl http://192.168.4.1/api/ping
-curl http://192.168.4.1/api/status
-curl -X POST http://192.168.4.1/api/command -H "Content-Type: application/json" -d '{"command":"dogalgaz_ac"}'
-curl -X POST http://192.168.4.1/api/command -H "Content-Type: application/json" -d '{"command":"elektrik_ac"}'
-curl -X POST http://192.168.4.1/api/command -H "Content-Type: application/json" -d '{"command":"reset_alarm"}'
 ```
+Arduino Uno          Komponent
+─────────────────────────────────
+Pin 4           →    LED Kırmızı (Deprem)
+Pin 5           →    LED Yeşil   (Gaz)
+Pin 6           →    LED Mavi    (Elektrik)
+Pin 7           →    Buzzer
+Pin 10 (RX)     ←    HC-06 TX
+Pin 11 (TX)     →    HC-06 RX  (voltaj bölücü!)
+A4 (SDA)        →    MPU6050 SDA
+A5 (SCL)        →    MPU6050 SCL
+5V              →    HC-06 VCC, MPU6050 VCC
+GND             →    Ortak GND
+```
+
+---
+
+## Sorun Giderme
+
+| Sorun | Çözüm |
+|-------|-------|
+| "ODAK_Sistem" bulunamadı | HC-06 güç kontrolü, eşleştirme |
+| Bluetooth bağlanamadı | PIN: 1234 doğru mu? |
+| Veri gelmiyor | TX/RX kablo kontrolü, baud rate 9600 |
+| Garip karakterler | Voltaj bölücü kontrolü |
+| Deprem sürekli algılanıyor | `esik_deger` artırın |

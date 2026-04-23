@@ -1,0 +1,76 @@
+// ─── plugins bloğu MUTLAKA EN ÜSTTE olmalı (AGP 8.x kuralı) ───────────────
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+// ─── Sürüm bilgilerini local.properties'ten oku ──────────────────────────────
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
+def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0"
+
+// ─── Android yapılandırması ──────────────────────────────────────────────────
+android {
+    namespace = "com.odak"
+
+    // AGP 8.9.1 + Gradle 8.12 → flutter SDK sürümlerini kullan
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    // Kotlin 2.1.0
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
+    defaultConfig {
+        applicationId = "com.odak"
+
+        // flutter_bluetooth_serial v0.4.0 + permission_handler v11 min 21 gerektirir.
+        // flutter.minSdkVersion varsayılan olarak 16'dır → build fail olur.
+        // ⚠️ flutter.minSdkVersion = 16 (varsayılan) — KULLANILMAZ
+        // flutter_bluetooth_serial v0.4.0 → min 21
+        // permission_handler v11         → min 21
+        // ╔══════════════════════════════════════════════════════════╗
+        // ║  minSdk = 21  — ASLA DÜŞÜRME / DEĞİŞTİRME!            ║
+        // ║  flutter.minSdkVersion = 16 (Flutter varsayılanı)      ║
+        // ║  flutter_bluetooth_serial v0.4.0  → min Android 21     ║
+        // ║  permission_handler v11+          → min Android 21     ║
+        // ║  flutter.minSdkVersion kullanılırsa BUILD FAIL olur.   ║
+        // ╚══════════════════════════════════════════════════════════╝
+        minSdkVersion flutter.minSdkVersion
+
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutterVersionCode.toInteger()
+        versionName = flutterVersionName
+    }
+
+    buildTypes {
+        release {
+            // Üretim sürümünde özel imzalama ayarlanana kadar debug key kullan
+            signingConfig = signingConfigs.debug
+            minifyEnabled = false
+            shrinkResources = false
+        }
+        debug {
+            signingConfig = signingConfigs.debug
+        }
+    }
+}
+
+// ─── Flutter bağlantısı ──────────────────────────────────────────────────────
+flutter {
+    source = "../.."
+}

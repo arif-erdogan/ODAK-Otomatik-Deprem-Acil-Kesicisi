@@ -1,81 +1,58 @@
 // ============================================================
 // main.dart — ODAK Otomatik Deprem Acil Kesicisi
-// Mobil Uygulama Ana Ekranı
+// Mobil Uygulama Ana Ekranı  |  v3.3 (Cihaz Listesi)
 //
-// Haberleşme Önceliği:
-//   Plan C → WiFi REST API  (ESP32 aynı ağda)
-//   Plan A → Firebase RTDB  (internet üzerinden)
-//   Plan B → BLE Bluetooth  (yakın mesafe, yedek)
+// Haberleşme:
+//   Bluetooth Serial (SPP) — Arduino Uno + HC-06
+//   (WiFi ve Firebase kaldırıldı)
 // ============================================================
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-import 'firebase_options.dart';
-import 'services/firebase_service.dart';
 import 'services/ble_service.dart';
-import 'services/wifi_api_service.dart';
-
-// ================================================================
-// FCM: arka plan mesaj handler (top-level zorunlu)
-// ================================================================
-@pragma('vm:entry-point')
-Future<void> _fcmArkaplanHandler(RemoteMessage mesaj) async {
-  debugPrint('FCM arka plan: ${mesaj.notification?.title}');
-}
+import 'screens/devices_screen.dart';
 
 // ================================================================
 // Uygulama girişi
 // ================================================================
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  var firebaseHazir = true;
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('[Firebase] Başlatıldı ✅');
-  } catch (e) {
-    firebaseHazir = false;
-    debugPrint('[Firebase] Başlatılamadı — WiFi/BLE moduna geçildi: $e');
-    // firebase_options.dart dosyasındaki BURAYA_* alanlarını doldurun!
-  }
-  runApp(OdakApp(firebaseHazir: firebaseHazir));
+  runApp(const OdakApp());
 }
 
 // ================================================================
 // Renk & Tasarım Sabitleri
 // ================================================================
 class OdakColors {
-  static const Color primary      = Color(0xFF005EAC);
-  static const Color primaryDark  = Color(0xFF003D7A);
+  static const Color primary = Color(0xFF005EAC);
+  static const Color primaryDark = Color(0xFF003D7A);
   static const Color primaryLight = Color(0xFF1E88E5);
-  static const Color success      = Color(0xFF2E7D32);
-  static const Color warning      = Color(0xFFFF9800);
-  static const Color danger       = Color(0xFFC62828);
-  static const Color background   = Color(0xFFF5F7FA);
-  static const Color surface      = Color(0xFFFFFFFF);
-  static const Color textPrimary  = Color(0xFF1A1A2E);
-  static const Color textSecondary= Color(0xFF6B7280);
+  static const Color success = Color(0xFF2E7D32);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color danger = Color(0xFFC62828);
+  static const Color background = Color(0xFFF5F7FA);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFF1A1A2E);
+  static const Color textSecondary = Color(0xFF6B7280);
   static const Color textTertiary = Color(0xFFBDBDBD);
 }
 
 class OdakSpacing {
-  static const double xs  = 4;
-  static const double sm  = 8;
-  static const double md  = 16;
-  static const double lg  = 24;
-  static const double xl  = 32;
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
   static const double xxl = 48;
 }
 
 class OdakRadius {
-  static const double sm     = 8;
-  static const double md     = 12;
-  static const double lg     = 16;
-  static const double xl     = 20;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 20;
   static const double circle = 100;
 }
 
@@ -83,8 +60,7 @@ class OdakRadius {
 // Kök Widget
 // ================================================================
 class OdakApp extends StatelessWidget {
-  final bool firebaseHazir;
-  const OdakApp({super.key, this.firebaseHazir = true});
+  const OdakApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -94,16 +70,16 @@ class OdakApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.light(
-          primary:            OdakColors.primary,
-          onPrimary:          Colors.white,
-          primaryContainer:   OdakColors.primaryLight,
+          primary: OdakColors.primary,
+          onPrimary: Colors.white,
+          primaryContainer: OdakColors.primaryLight,
           onPrimaryContainer: Colors.white,
-          secondary:          OdakColors.warning,
-          onSecondary:        Colors.white,
-          error:              OdakColors.danger,
-          onError:            Colors.white,
-          surface:            OdakColors.surface,
-          onSurface:          OdakColors.textPrimary,
+          secondary: OdakColors.warning,
+          onSecondary: Colors.white,
+          error: OdakColors.danger,
+          onError: Colors.white,
+          surface: OdakColors.surface,
+          onSurface: OdakColors.textPrimary,
         ),
         scaffoldBackgroundColor: OdakColors.background,
         appBarTheme: const AppBarTheme(
@@ -137,7 +113,7 @@ class OdakApp extends StatelessWidget {
           margin: EdgeInsets.zero,
         ),
       ),
-      home: AnaSayfa(firebaseHazir: firebaseHazir),
+      home: const DevicesScreen(),
     );
   }
 }
@@ -146,8 +122,7 @@ class OdakApp extends StatelessWidget {
 // Ana Sayfa
 // ================================================================
 class AnaSayfa extends StatefulWidget {
-  final bool firebaseHazir;
-  const AnaSayfa({super.key, this.firebaseHazir = true});
+  const AnaSayfa({super.key});
 
   @override
   State<AnaSayfa> createState() => _AnaSayfaState();
@@ -155,44 +130,112 @@ class AnaSayfa extends StatefulWidget {
 
 class _AnaSayfaState extends State<AnaSayfa>
     with SingleTickerProviderStateMixin {
-
   // ---------- Servisler ----------
-  FirebaseService?   _fb;
-  final _ble  = BleService();
-  final _wifi = WifiApiService();
+  final _bt = BleService();
 
   // ---------- Durum ----------
-  CihazDurumu?       _cihazDurumu;
-  String             _bilgiMetni = 'Sistem bekleniyor...';
-  bool               _islemVar   = false;
-  BleDurum?          _bleDurum;
-  WifiBaglantiDurumu _wifiDurum  = WifiBaglantiDurumu.bilinmiyor;
+  ArduinoDurum? _arduinoDurum;
+  String _bilgiMetni = 'Bluetooth bağlantısı bekleniyor...';
+  bool _islemVar = false;
+  BtDurum _btDurum = BtDurum.hazir;
 
   // ---------- Abonelikler ----------
-  StreamSubscription<CihazDurumu>?        _fbAbone;
-  StreamSubscription<BleDurum>?           _bleAbone;
-  StreamSubscription<EspDurum>?           _wifiAbone;
-  StreamSubscription<WifiBaglantiDurumu>? _wifiBaglantiAbone;
+  StreamSubscription<BtDurum>? _btDurumAbone;
+  StreamSubscription<ArduinoDurum>? _arduinoAbone;
+  StreamSubscription<String>? _yanitAbone;
 
   // ---------- Animasyon ----------
   late AnimationController _animKontrol;
-  late Animation<double>   _opasiteAnim;
+  late Animation<double> _opasiteAnim;
 
   // ----------------------------------------------------------------
   @override
   void initState() {
     super.initState();
     _animasyonKur();
-    _bleDinle();
-    _wifiDinle();
+    _bluetoothDinle();
+    // Uygulama açılışında izin + BT akışını başlat
+    WidgetsBinding.instance.addPostFrameCallback((_) => _baslatAkisi());
+  }
 
-    if (widget.firebaseHazir) {
-      _fb = FirebaseService();
-      _firebaseDinle();
-      _fcmKur();
-    } else {
-      _bilgiMetni = 'Firebase yok — WiFi/BLE modu aktif.';
+  // ── Başlangıç Akışı ─────────────────────────────────────────
+  Future<void> _baslatAkisi() async {
+    // 1. Bluetooth açık mı?
+    final btAcik = await _bt.bluetoothAcikMi();
+    if (!mounted) return;
+
+    if (!btAcik) {
+      setState(() => _bilgiMetni = '⚠️ Bluetooth kapalı. Lütfen açın.');
+      // baglan() zaten BT açma isteği yapıyor — direkt o akışa gir
+      await _bluetoothBaglan();
+      return;
     }
+
+    // 2. İzinleri iste ("Yakındaki Cihazlar" diyaloğu burada açılır)
+    setState(() => _bilgiMetni = '🔐 Bluetooth izinleri isteniyor...');
+    final izinOk = await _bt.izinleriKontrolEt();
+    if (!mounted) return;
+
+    if (!izinOk) {
+      // Kalıcı red → ayarlara yönlendir
+      final kaliciRed = await _bt.izinKaliciRedMi();
+      if (!mounted) return;
+
+      if (kaliciRed) {
+        _kaliciRedDiyalogu();
+      } else {
+        setState(() => _bilgiMetni =
+            '❌ Bluetooth izinleri reddedildi. Tekrar denemek için dokunun.');
+      }
+      return;
+    }
+
+    // 3. İzinler tamam → otomatik bağlan
+    await _bluetoothBaglan();
+  }
+
+  // ── Kalıcı Red Diyaloğu ─────────────────────────────────────
+  void _kaliciRedDiyalogu() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(OdakRadius.xl)),
+        title: const Row(
+          children: [
+            Icon(Icons.bluetooth_disabled_rounded,
+                color: OdakColors.danger, size: 28),
+            SizedBox(width: 10),
+            Text('Bluetooth İzni Gerekli',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: const Text(
+          'ODAK uygulamasının çalışabilmesi için\n'
+          '"Yakındaki Cihazlar" iznine ihtiyaç vardır.\n\n'
+          'Ayarlar → Uygulamalar → ODAK → İzinler\n'
+          'bölümünden izni etkinleştirin.',
+          style: TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              openAppSettings();
+            },
+            icon: const Icon(Icons.settings_rounded, size: 16),
+            label: const Text('Ayarları Aç'),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: OdakColors.primary),
+          ),
+        ],
+      ),
+    );
   }
 
   // ----------------------------------------------------------------
@@ -201,229 +244,139 @@ class _AnaSayfaState extends State<AnaSayfa>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
-    _opasiteAnim = Tween<double>(begin: 0.6, end: 1.0)
-        .animate(CurvedAnimation(parent: _animKontrol, curve: Curves.easeInOut));
+    _opasiteAnim = Tween<double>(begin: 0.6, end: 1.0).animate(
+        CurvedAnimation(parent: _animKontrol, curve: Curves.easeInOut));
   }
 
   // ----------------------------------------------------------------
-  void _firebaseDinle() {
-    _fbAbone = _fb!.cihazDurumu.listen(
-      (durum) => setState(() {
-        _cihazDurumu = durum;
-        _bilgiMetni  = durum.tehlikede
-            ? '⚠️ Deprem algılandı! Gaz ve elektrik kesildi.'
-            : '✅ Sistem güvende — Sinyal: ${durum.sinyalKalitesi}';
-        if (!durum.tehlikede) _islemVar = false;
-      }),
-      onError: (e) => setState(() => _bilgiMetni = '🔴 Firebase hatası: $e'),
-    );
-  }
-
-  // ----------------------------------------------------------------
-  void _bleDinle() {
-    _bleAbone = _ble.durumStream.listen((durum) {
+  void _bluetoothDinle() {
+    // Bağlantı durumu
+    _btDurumAbone = _bt.durumStream.listen((durum) {
       if (!mounted) return;
       setState(() {
-        _bleDurum   = durum;
+        _btDurum = durum;
         _bilgiMetni = durum.metin;
-        if (durum == BleDurum.komutGonderildi || durum == BleDurum.hata) {
+        if (durum == BtDurum.komutGonderildi || durum == BtDurum.hata) {
           _islemVar = false;
         }
       });
     });
-  }
 
-  // ----------------------------------------------------------------
-  void _wifiDinle() {
-    _wifiBaglantiAbone = _wifi.baglantiStream.listen((durum) {
-      if (!mounted) return;
-      setState(() => _wifiDurum = durum);
-    });
-    _wifiAbone = _wifi.espDurumStream.listen((espDurum) {
+    // Arduino durum güncellemeleri
+    _arduinoAbone = _bt.arduinoDurumStream.listen((durum) {
       if (!mounted) return;
       setState(() {
-        _bilgiMetni = espDurum.tehlikede
-            ? '⚠️ ESP32: Deprem algılandı! Gaz ve elektrik kesildi.'
-            : '✅ ESP32 Güvende — Sinyal: ${espDurum.sinyalKalitesi}';
+        _arduinoDurum = durum;
+        if (durum.tehlikede) {
+          _bilgiMetni = '⚠️ Deprem algılandı! Gaz ve elektrik kesildi.';
+        } else {
+          _bilgiMetni = '✅ Sistem güvende — Uptime: ${durum.uptimeSn}s';
+        }
       });
+    });
+
+    // Komut yanıtları
+    _yanitAbone = _bt.yanitStream.listen((yanit) {
+      if (!mounted) return;
+      if (yanit.startsWith('OK:')) {
+        _snackGoster('✅ ${yanit.substring(3)} başarılı',
+            renk: OdakColors.success);
+      } else if (yanit.startsWith('ERR:')) {
+        _snackGoster('❌ Hata: ${yanit.substring(4)}', renk: OdakColors.danger);
+      } else if (yanit.startsWith('ALARM:')) {
+        _snackGoster('⚠️ ${yanit.substring(6)}', renk: OdakColors.danger);
+      }
     });
   }
 
   // ----------------------------------------------------------------
-  void _ipDialogGoster() {
-    // Mevcut IP'yi göster (boşsa SoftAP varsayılanı)
-    final controller = TextEditingController(text: _wifi.espIpAdresi);
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(OdakRadius.xl),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.router, color: OdakColors.primary),
-            SizedBox(width: 8),
-            Text('ESP32 WiFi Bağlantısı'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // SoftAP hızlı bağlantı butonu
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _wifi.softApBaglantisiKur();
-                setState(() => _bilgiMetni = 'SoftAP bağlantısı test ediliyor...');
-                _wifiBaglantiTest();
-              },
-              icon: const Icon(Icons.wifi_tethering, size: 16),
-              label: const Text('SoftAP ile Otomatik Bağlan\n(192.168.4.1)',
-                  style: TextStyle(fontSize: 12)),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(child: Divider()),
-                  Padding(padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('veya manuel IP', style: TextStyle(fontSize: 11))),
-                  Expanded(child: Divider()),
-                ],
-              ),
-            ),
-            const Text(
-              'ESP32 farklı bir ağdaysa IP\'sini girin.\n'
-              'IP\'yi Arduino Serial Monitor\'dan öğrenebilirsiniz.',
-              style: TextStyle(fontSize: 12, color: OdakColors.textSecondary, height: 1.5),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'IP Adresi',
-                hintText: '192.168.4.1',
-                prefixIcon: const Icon(Icons.lan),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(OdakRadius.md),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              final ip = controller.text.trim();
-              if (ip.isNotEmpty) {
-                _wifi.espIpAdresi = ip;
-                setState(() => _bilgiMetni = 'ESP32 bağlantısı test ediliyor...');
-                Navigator.pop(ctx);
-                _wifiBaglantiTest();
-              }
-            },
-            icon: const Icon(Icons.wifi, size: 16),
-            label: const Text('Manuel Bağlan'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _bluetoothBaglan() async {
+    setState(() {
+      _islemVar = true;
+      _bilgiMetni = '🔄 Arduino aranıyor...';
+    });
 
-  // ----------------------------------------------------------------
-  Future<void> _wifiBaglantiTest() async {
-    setState(() => _bilgiMetni = '🔄 ESP32 aranıyor...');
-    final baglandi = await _wifi.ping();
+    final sonuc = await _bt.baglan();
+
     if (!mounted) return;
-    if (baglandi) {
-      setState(() => _bilgiMetni = '✅ ESP32 bağlandı — WiFi SoftAP üzerinden.');
-      _wifi.pollingBaslat(saniye: 3);
-    } else {
-      setState(() => _bilgiMetni =
-          '❌ ESP32\'ye ulaşılamadı. "ODAK_Sistem" ağına bağlı olduğunuzdan emin olun.');
-      _snackGoster(
-        'ESP32 bağlantısı başarısız. WiFi ağını kontrol edin.',
-        renk: OdakColors.danger,
-      );
+    setState(() {
+      _islemVar = false;
+      _bilgiMetni = sonuc.basarili
+          ? '✅ Bluetooth bağlandı — Arduino ile iletişim kuruldu.'
+          : '❌ ${sonuc.mesaj}';
+    });
+
+    if (!sonuc.basarili) {
+      _snackGoster(sonuc.mesaj, renk: OdakColors.danger);
     }
   }
 
   // ----------------------------------------------------------------
-  Future<void> _fcmKur() async {
-    FirebaseMessaging.onBackgroundMessage(_fcmArkaplanHandler);
-    final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
-    await messaging.subscribeToTopic('deprem_alarmi');
-    FirebaseMessaging.onMessage.listen((mesaj) {
-      final baslik = mesaj.notification?.title ?? '';
-      final govde  = mesaj.notification?.body  ?? '';
-      _snackGoster('$baslik — $govde', renk: OdakColors.danger);
-    });
-  }
-
-  // ----------------------------------------------------------------
-  // Elektrik Aktifleştir  (WiFi → Firebase → BLE)
+  // Elektrik Aktifleştir (Bluetooth)
   // ----------------------------------------------------------------
   Future<void> _elektrikAktif() async {
     if (_islemVar) return;
-    setState(() { _islemVar = true; _bilgiMetni = 'Elektrik komutu gönderiliyor...'; });
+    setState(() {
+      _islemVar = true;
+      _bilgiMetni = 'Elektrik komutu gönderiliyor...';
+    });
 
-    if (_wifi.ipGirildi) {
-      final sonuc = await _wifi.elektrikAktifEt();
-      if (sonuc.basarili) {
-        if (mounted) setState(() { _bilgiMetni = '✅ Elektrik verildi (WiFi)'; _islemVar = false; });
-        return;
-      }
-    }
+    final sonuc = await _bt.elektrikAktifEt();
 
-    if (widget.firebaseHazir && _fb != null) {
-      try {
-        await _fb!.elektrikAktifEt();
-        if (mounted) setState(() { _bilgiMetni = '✅ Elektrik komutu gönderildi.'; _islemVar = false; });
-        return;
-      } catch (_) {}
-    }
-
-    final sonuc = await _ble.elektrikAktifEt();
     if (mounted) {
+      setState(() {
+        _islemVar = false;
+        _bilgiMetni = sonuc.basarili
+            ? '✅ Elektrik verildi (Bluetooth)'
+            : '❌ ${sonuc.mesaj}';
+      });
       if (!sonuc.basarili) _snackGoster(sonuc.mesaj, renk: OdakColors.danger);
-      setState(() => _islemVar = false);
     }
   }
 
   // ----------------------------------------------------------------
-  // Doğalgaz Aktifleştir  (WiFi → Firebase → BLE)
+  // Doğalgaz Aktifleştir (Bluetooth)
   // ----------------------------------------------------------------
   Future<void> _dogalgazAktif() async {
     if (_islemVar) return;
-    setState(() { _islemVar = true; _bilgiMetni = 'Doğalgaz komutu gönderiliyor...'; });
+    setState(() {
+      _islemVar = true;
+      _bilgiMetni = 'Doğalgaz komutu gönderiliyor...';
+    });
 
-    if (_wifi.ipGirildi) {
-      final sonuc = await _wifi.gazAc();
-      if (sonuc.basarili) {
-        if (mounted) setState(() { _bilgiMetni = '✅ Doğalgaz açıldı (WiFi)'; _islemVar = false; });
-        return;
-      }
-    }
+    final sonuc = await _bt.dogalgazAktifEt();
 
-    if (widget.firebaseHazir && _fb != null) {
-      try {
-        await _fb!.dogalgazAktifEt();
-        if (mounted) setState(() { _bilgiMetni = '✅ Doğalgaz komutu gönderildi.'; _islemVar = false; });
-        return;
-      } catch (_) {}
-    }
-
-    final sonuc = await _ble.dogalgazAktifEt();
     if (mounted) {
+      setState(() {
+        _islemVar = false;
+        _bilgiMetni = sonuc.basarili
+            ? '✅ Doğalgaz açıldı (Bluetooth)'
+            : '❌ ${sonuc.mesaj}';
+      });
       if (!sonuc.basarili) _snackGoster(sonuc.mesaj, renk: OdakColors.danger);
-      setState(() => _islemVar = false);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Alarm Sıfırla (Bluetooth)
+  // ----------------------------------------------------------------
+  Future<void> _alarmSifirla() async {
+    if (_islemVar) return;
+    setState(() {
+      _islemVar = true;
+      _bilgiMetni = 'Alarm sıfırlanıyor...';
+    });
+
+    final sonuc = await _bt.alarmSifirla();
+
+    if (mounted) {
+      setState(() {
+        _islemVar = false;
+        _bilgiMetni = sonuc.basarili
+            ? '✅ Alarm sıfırlandı — Sistemler açıldı'
+            : '❌ ${sonuc.mesaj}';
+      });
+      if (!sonuc.basarili) _snackGoster(sonuc.mesaj, renk: OdakColors.danger);
     }
   }
 
@@ -435,7 +388,8 @@ class _AnaSayfaState extends State<AnaSayfa>
         content: Text(mesaj, style: const TextStyle(color: Colors.white)),
         backgroundColor: renk,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(OdakRadius.md)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(OdakRadius.md)),
         margin: const EdgeInsets.all(OdakSpacing.md),
       ),
     );
@@ -445,12 +399,10 @@ class _AnaSayfaState extends State<AnaSayfa>
   @override
   void dispose() {
     _animKontrol.dispose();
-    _fbAbone?.cancel();
-    _bleAbone?.cancel();
-    _wifiAbone?.cancel();
-    _wifiBaglantiAbone?.cancel();
-    _ble.kapat();
-    _wifi.kapat();
+    _btDurumAbone?.cancel();
+    _arduinoAbone?.cancel();
+    _yanitAbone?.cancel();
+    _bt.kapat();
     super.dispose();
   }
 
@@ -459,7 +411,7 @@ class _AnaSayfaState extends State<AnaSayfa>
   // ================================================================
   @override
   Widget build(BuildContext context) {
-    final tehlikede = _cihazDurumu?.tehlikede ?? false;
+    final tehlikede = _arduinoDurum?.tehlikede ?? false;
 
     return Scaffold(
       backgroundColor: OdakColors.background,
@@ -473,22 +425,25 @@ class _AnaSayfaState extends State<AnaSayfa>
           ],
         ),
         actions: [
-          // WiFi bağlantı badge'i
+          // Bluetooth bağlantı badge'i
           Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: _WifiBadge(
-              durum: _wifiDurum,
-              ipGirildi: _wifi.ipGirildi,
-              onTap: _ipDialogGoster,
+            child: _BluetoothBadge(
+              durum: _btDurum,
+              bagliMi: _bt.bagliMi,
+              onTap: _bluetoothBaglan,
             ),
           ),
           // Yenile butonu
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Yenile',
+            tooltip: 'Durum İste',
             onPressed: () {
-              if (_wifi.ipGirildi) _wifiBaglantiTest();
-              if (widget.firebaseHazir && _fb != null) _fb!.anlikDurum();
+              if (_bt.bagliMi) {
+                _bt.durumIste();
+              } else {
+                _bluetoothBaglan();
+              }
             },
           ),
         ],
@@ -502,15 +457,14 @@ class _AnaSayfaState extends State<AnaSayfa>
               _DurumKarti(
                 tehlikede: tehlikede,
                 animasyon: _opasiteAnim,
-                durum: _cihazDurumu,
+                durum: _arduinoDurum,
               ),
               const SizedBox(height: OdakSpacing.lg),
 
               // --- Bilgi / Bağlantı Durumu ---
               _BilgiKarti(
                 metin: _bilgiMetni,
-                bleDurum: _bleDurum,
-                wifiDurum: _wifiDurum,
+                btDurum: _btDurum,
                 islemVar: _islemVar,
               ),
               const SizedBox(height: OdakSpacing.xl),
@@ -539,13 +493,36 @@ class _AnaSayfaState extends State<AnaSayfa>
                   ),
                 ],
               ),
-              const SizedBox(height: OdakSpacing.lg),
+              const SizedBox(height: OdakSpacing.md),
 
-              // --- WiFi bağlantı kutu ---
-              _WifiKlavuz(
-                onTap: _ipDialogGoster,
-                bagli: _wifiDurum == WifiBaglantiDurumu.bagli,
+              // --- Alarm Sıfırla Butonu ---
+              if (tehlikede)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: OdakSpacing.md),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: _KontrolButon(
+                      onPressed: _islemVar ? null : _alarmSifirla,
+                      isLoading: _islemVar,
+                      icon: Icons.restart_alt_rounded,
+                      label: 'Alarmı Sıfırla\n(Tümünü Aç)',
+                      renk: OdakColors.danger,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: OdakSpacing.md),
+
+              // --- Bluetooth Kılavuz ---
+              _BluetoothKlavuz(
+                onTap: _bluetoothBaglan,
+                bagli: _bt.bagliMi,
               ),
+
+              // --- Sistem Bilgileri ---
+              if (_arduinoDurum != null) ...[
+                const SizedBox(height: OdakSpacing.lg),
+                _SistemBilgiKarti(durum: _arduinoDurum!),
+              ],
             ],
           ),
         ),
@@ -558,9 +535,9 @@ class _AnaSayfaState extends State<AnaSayfa>
 // Durum Kartı Widget
 // ================================================================
 class _DurumKarti extends StatelessWidget {
-  final bool               tehlikede;
-  final Animation<double>  animasyon;
-  final CihazDurumu?       durum;
+  final bool tehlikede;
+  final Animation<double> animasyon;
+  final ArduinoDurum? durum;
 
   const _DurumKarti({
     required this.tehlikede,
@@ -579,13 +556,14 @@ class _DurumKarti extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 400),
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: OdakSpacing.xl, horizontal: OdakSpacing.lg),
+        padding: const EdgeInsets.symmetric(
+            vertical: OdakSpacing.xl, horizontal: OdakSpacing.lg),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: tehlikede
-                ? [OdakColors.danger, Color(0xFFB71C1C)]
+                ? [OdakColors.danger, const Color(0xFFB71C1C)]
                 : [OdakColors.primaryDark, OdakColors.primary],
           ),
           borderRadius: BorderRadius.circular(OdakRadius.xl),
@@ -608,7 +586,9 @@ class _DurumKarti extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.18),
               ),
               child: Icon(
-                tehlikede ? Icons.warning_amber_rounded : Icons.verified_user_rounded,
+                tehlikede
+                    ? Icons.warning_amber_rounded
+                    : Icons.verified_user_rounded,
                 size: 40,
                 color: Colors.white,
               ),
@@ -624,17 +604,18 @@ class _DurumKarti extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (durum != null && tehlikede) ...[
+            if (tehlikede) ...[
               const SizedBox(height: OdakSpacing.md),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(OdakRadius.circle),
                 ),
-                child: Text(
-                  'Son deprem: ${_formatZaman(durum!.sonDepremZamani)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                child: const Text(
+                  'Deprem algılandı — Gaz ve elektrik kesildi!',
+                  style: TextStyle(color: Colors.white, fontSize: 13),
                 ),
               ),
             ],
@@ -643,27 +624,19 @@ class _DurumKarti extends StatelessWidget {
       ),
     );
   }
-
-  String _formatZaman(int ts) {
-    if (ts == 0) return 'bilinmiyor';
-    final dt = DateTime.fromMillisecondsSinceEpoch(ts);
-    return '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
-  }
 }
 
 // ================================================================
 // Bilgi Kartı Widget
 // ================================================================
 class _BilgiKarti extends StatelessWidget {
-  final String             metin;
-  final BleDurum?          bleDurum;
-  final WifiBaglantiDurumu wifiDurum;
-  final bool               islemVar;
+  final String metin;
+  final BtDurum btDurum;
+  final bool islemVar;
 
   const _BilgiKarti({
     required this.metin,
-    required this.bleDurum,
-    required this.wifiDurum,
+    required this.btDurum,
     required this.islemVar,
   });
 
@@ -726,18 +699,22 @@ class _BilgiKarti extends StatelessWidget {
   }
 
   Color _renkSec() {
-    if (metin.contains('⚠️') || bleDurum == BleDurum.hata) return OdakColors.danger;
-    if (wifiDurum == WifiBaglantiDurumu.bagli) return OdakColors.success;
-    if (bleDurum == BleDurum.komutGonderildi) return OdakColors.success;
-    if (bleDurum != null) return OdakColors.primary;
+    if (metin.contains('⚠️') || btDurum == BtDurum.hata)
+      return OdakColors.danger;
+    if (btDurum == BtDurum.bagli) return OdakColors.success;
+    if (btDurum == BtDurum.komutGonderildi) return OdakColors.success;
+    if (btDurum == BtDurum.taraniyor || btDurum == BtDurum.baglaniyor)
+      return OdakColors.primary;
     return OdakColors.textTertiary;
   }
 
   IconData _ikonSec() {
-    if (metin.contains('⚠️') || bleDurum == BleDurum.hata) return Icons.error_outline_rounded;
-    if (wifiDurum == WifiBaglantiDurumu.bagli) return Icons.wifi_rounded;
-    if (bleDurum == BleDurum.komutGonderildi) return Icons.check_circle_outline_rounded;
-    if (bleDurum != null) return Icons.bluetooth_rounded;
+    if (metin.contains('⚠️') || btDurum == BtDurum.hata)
+      return Icons.error_outline_rounded;
+    if (btDurum == BtDurum.bagli) return Icons.bluetooth_connected_rounded;
+    if (btDurum == BtDurum.komutGonderildi)
+      return Icons.check_circle_outline_rounded;
+    if (btDurum == BtDurum.taraniyor) return Icons.bluetooth_searching_rounded;
     return Icons.info_outline_rounded;
   }
 }
@@ -747,10 +724,10 @@ class _BilgiKarti extends StatelessWidget {
 // ================================================================
 class _KontrolButon extends StatefulWidget {
   final VoidCallback? onPressed;
-  final bool          isLoading;
-  final IconData      icon;
-  final String        label;
-  final Color         renk;
+  final bool isLoading;
+  final IconData icon;
+  final String label;
+  final Color renk;
 
   const _KontrolButon({
     required this.onPressed,
@@ -767,18 +744,22 @@ class _KontrolButon extends StatefulWidget {
 class _KontrolButonState extends State<_KontrolButon>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double>   _scale;
+  late Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 150));
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 150));
     _scale = Tween<double>(begin: 1.0, end: 0.94)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   void _onTap() {
     if (widget.onPressed == null || widget.isLoading) return;
@@ -805,20 +786,23 @@ class _KontrolButonState extends State<_KontrolButon>
                   : [widget.renk, widget.renk.withValues(alpha: 0.75)],
             ),
             borderRadius: BorderRadius.circular(OdakRadius.xl),
-            boxShadow: disabled ? [] : [
-              BoxShadow(
-                color: widget.renk.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            boxShadow: disabled
+                ? []
+                : [
+                    BoxShadow(
+                      color: widget.renk.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               widget.isLoading
                   ? const SizedBox(
-                      width: 36, height: 36,
+                      width: 36,
+                      height: 36,
                       child: CircularProgressIndicator(
                         strokeWidth: 3,
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -845,35 +829,41 @@ class _KontrolButonState extends State<_KontrolButon>
 }
 
 // ================================================================
-// WiFi Badge (AppBar)
+// Bluetooth Badge (AppBar)
 // ================================================================
-class _WifiBadge extends StatelessWidget {
-  final WifiBaglantiDurumu durum;
-  final bool               ipGirildi;
-  final VoidCallback        onTap;
+class _BluetoothBadge extends StatelessWidget {
+  final BtDurum durum;
+  final bool bagliMi;
+  final VoidCallback onTap;
 
-  const _WifiBadge({
+  const _BluetoothBadge({
     required this.durum,
-    required this.ipGirildi,
+    required this.bagliMi,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Color  renk;
+    final Color renk;
     final IconData ikon;
-    final String   etiket;
+    final String etiket;
 
-    switch (durum) {
-      case WifiBaglantiDurumu.bagli:
-        renk = const Color(0xFF4CAF50); ikon = Icons.wifi_rounded; etiket = 'WiFi ✓';
-      case WifiBaglantiDurumu.baglanamadi:
-      case WifiBaglantiDurumu.zamanasimiAsildi:
-        renk = const Color(0xFFEF5350); ikon = Icons.wifi_off_rounded; etiket = 'Bağlantı Yok';
-      default:
-        renk = ipGirildi ? OdakColors.warning : Colors.white54;
-        ikon = Icons.wifi_find_rounded;
-        etiket = ipGirildi ? 'Test Et' : 'IP Gir';
+    if (bagliMi || durum == BtDurum.bagli) {
+      renk = const Color(0xFF4CAF50);
+      ikon = Icons.bluetooth_connected_rounded;
+      etiket = 'BT ✓';
+    } else if (durum == BtDurum.hata || durum == BtDurum.kapali) {
+      renk = const Color(0xFFEF5350);
+      ikon = Icons.bluetooth_disabled_rounded;
+      etiket = 'BT ✗';
+    } else if (durum == BtDurum.taraniyor || durum == BtDurum.baglaniyor) {
+      renk = OdakColors.warning;
+      ikon = Icons.bluetooth_searching_rounded;
+      etiket = 'Arıyor...';
+    } else {
+      renk = Colors.white54;
+      ikon = Icons.bluetooth_rounded;
+      etiket = 'Bağlan';
     }
 
     return GestureDetector(
@@ -891,7 +881,9 @@ class _WifiBadge extends StatelessWidget {
           children: [
             Icon(ikon, size: 13, color: renk),
             const SizedBox(width: 4),
-            Text(etiket, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: renk)),
+            Text(etiket,
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: renk)),
           ],
         ),
       ),
@@ -900,22 +892,23 @@ class _WifiBadge extends StatelessWidget {
 }
 
 // ================================================================
-// WiFi Kılavuz Kartı (IP girilmemişse göster)
+// Bluetooth Kılavuz Kartı
 // ================================================================
-class _WifiKlavuz extends StatelessWidget {
+class _BluetoothKlavuz extends StatelessWidget {
   final VoidCallback onTap;
-  final bool         bagli;
-  const _WifiKlavuz({required this.onTap, this.bagli = false});
+  final bool bagli;
+  const _BluetoothKlavuz({required this.onTap, this.bagli = false});
 
   @override
   Widget build(BuildContext context) {
-    final renk  = bagli ? OdakColors.success : OdakColors.primary;
+    final renk = bagli ? OdakColors.success : OdakColors.primary;
     final metin = bagli
-        ? 'ESP32 bağlı — "ODAK_Sistem" ağı üzerinden izleniyor.'
-        : 'ESP32 bağlantısı için dokun.\n"ODAK_Sistem" WiFi ağına bağlı olduğunuzdan emin olun.';
-    final ikon  = bagli
-        ? Icons.wifi_rounded
-        : Icons.tips_and_updates_rounded;
+        ? 'Arduino bağlı — Bluetooth üzerinden izleniyor.'
+        : 'Arduino\'ya bağlanmak için dokunun.\n'
+            'HC-06 modülü açık ve eşleştirilmiş olmalıdır. (PIN: 1234)';
+    final ikon = bagli
+        ? Icons.bluetooth_connected_rounded
+        : Icons.bluetooth_searching_rounded;
 
     return GestureDetector(
       onTap: onTap,
@@ -948,5 +941,97 @@ class _WifiKlavuz extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ================================================================
+// Sistem Bilgi Kartı (Arduino durumu gösterir)
+// ================================================================
+class _SistemBilgiKarti extends StatelessWidget {
+  final ArduinoDurum durum;
+  const _SistemBilgiKarti({required this.durum});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(OdakSpacing.md),
+      decoration: BoxDecoration(
+        color: OdakColors.surface,
+        borderRadius: BorderRadius.circular(OdakRadius.lg),
+        border: Border.all(
+          color: OdakColors.primary.withValues(alpha: 0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: OdakColors.primary.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.developer_board_rounded,
+                  size: 18, color: OdakColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'Arduino Bilgileri',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: OdakColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          _bilgiSatiri(
+              'Deprem',
+              durum.depremAlgilandi ? '⚠️ ALGILANDI' : '✅ Yok',
+              durum.depremAlgilandi ? OdakColors.danger : OdakColors.success),
+          _bilgiSatiri('Doğalgaz', durum.gazAcik ? '✅ Açık' : '🔴 Kapalı',
+              durum.gazAcik ? OdakColors.success : OdakColors.danger),
+          _bilgiSatiri('Elektrik', durum.elektrikAcik ? '✅ Açık' : '🔴 Kesik',
+              durum.elektrikAcik ? OdakColors.success : OdakColors.danger),
+          _bilgiSatiri('Deprem Sayacı', '${durum.depremSayaci}/3',
+              OdakColors.textSecondary),
+          _bilgiSatiri('Eşik Değer', '${durum.esikDeger} m/s²',
+              OdakColors.textSecondary),
+          _bilgiSatiri('Uptime', _formatUptime(durum.uptimeSn),
+              OdakColors.textSecondary),
+        ],
+      ),
+    );
+  }
+
+  Widget _bilgiSatiri(String baslik, String deger, Color renk) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(baslik,
+              style: const TextStyle(
+                  fontSize: 12, color: OdakColors.textSecondary)),
+          Text(deger,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: renk)),
+        ],
+      ),
+    );
+  }
+
+  String _formatUptime(int sn) {
+    final saat = sn ~/ 3600;
+    final dakika = (sn % 3600) ~/ 60;
+    final saniye = sn % 60;
+    if (saat > 0) return '${saat}sa ${dakika}dk';
+    if (dakika > 0) return '${dakika}dk ${saniye}sn';
+    return '${saniye}sn';
   }
 }
